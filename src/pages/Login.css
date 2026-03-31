@@ -1,0 +1,56 @@
+.login-container {
+  max-width: 400px;
+  margin: 0 auto;
+  padding-top: 2rem;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-logo .logo-icon {
+  font-size: 4rem;
+  color: var(--ion-color-primary);
+}
+
+.login-logo h1 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.login-logo p {
+  margin: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+.login-form {
+  background: transparent;
+  --background: transparent;
+}
+
+.login-form ion-item {
+  --background: var(--ion-item-background);
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+}
+
+.login-button {
+  margin-top: 1.5rem;
+  height: 48px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.login-button ion-spinner {
+  margin-right: 8px;
+}
+
+.error-message {
+  text-align: center;
+  margin-top: 1rem;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+}
