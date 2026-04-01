@@ -35,13 +35,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (isAuth) {
         const tokens = await authService.getTokens();
-        setState({
+        
+        setState(prev => ({
+          ...prev,
           isAuthenticated: true,
           user: null, // Will be loaded on demand
           tokens,
           isLoading: false,
           error: null,
-        });
+        }));
       } else {
         setState({
           isAuthenticated: false,
@@ -51,7 +53,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           error: null,
         });
       }
-    } catch {
+    } catch (error) {
+      console.error('[AuthContext] checkAuth: Error during auth check:', error);
       setState({
         isAuthenticated: false,
         user: null,
@@ -85,6 +88,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         err.message || 
         'Login failed. Please check your credentials.';
       
+      console.error('[AuthContext] login: Login failed:', errorMessage);
       setState(prev => ({
         ...prev,
         isLoading: false,

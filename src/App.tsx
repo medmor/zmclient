@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts';
 import Login from './pages/Login';
 import Home from './pages/Home';
+import Monitors from './pages/Monitors';
+import MonitorDetail from './pages/MonitorDetail';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -76,6 +78,16 @@ const App: React.FC = () => (
             <Route exact path="/home">
               <ProtectedRoute>
                 <Home />
+              </ProtectedRoute>
+            </Route>
+            <Route exact path="/monitors">
+              <ProtectedRoute>
+                <Monitors />
+              </ProtectedRoute>
+            </Route>
+            <Route exact path="/monitors/:id">
+              <ProtectedRoute>
+                <MonitorDetail />
               </ProtectedRoute>
             </Route>
             <Route exact path="/">

@@ -1,0 +1,35 @@
+.monitor-detail-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.live-stream {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000;
+  min-height: 300px;
+}
+
+.monitor-name {
+  text-align: center;
+  padding: 16px;
+}
+
+.monitor-name h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--ion-color-dark);
+}
+
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  text-align: center;
+}

@@ -18,12 +18,14 @@ import {
   IonAlert,
   IonIcon,
 } from '@ionic/react';
+import { useIonRouter } from '@ionic/react';
 import { eyeOutline, eyeOffOutline, serverOutline } from 'ionicons/icons';
 import { useAuth } from '../contexts';
 import './Login.css';
 
 const Login: React.FC = () => {
   const { login, isLoading, error } = useAuth();
+  const ionRouter = useIonRouter();
   
   const [baseUrl, setBaseUrl] = useState('');
   const [username, setUsername] = useState('');
@@ -40,6 +42,8 @@ const Login: React.FC = () => {
 
     try {
       await login({ username, password }, baseUrl);
+      // Navigate to home page after successful login
+      ionRouter.push('/home', 'forward', 'replace');
     } catch {
       setShowError(true);
     }

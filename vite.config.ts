@@ -10,6 +10,27 @@ export default defineConfig({
     react(),
     legacy()
   ],
+  server: {
+    proxy: {
+      '/zm/api': {
+        target: process.env.VITE_ZM_SERVER_URL || 'http://192.168.1.60',
+        changeOrigin: true,
+        secure: false,
+        // Ensure cookies are forwarded for session-based authentication
+        cookieDomainRewrite: {
+          '*': ''
+        },
+        // Rewrite cookie path to match the proxy path
+        cookiePathRewrite: {
+          '*': ''
+        },
+        // Additional headers for proper cookie handling
+        headers: {
+          'X-Forwarded-Host': 'localhost'
+        }
+      }
+    }
+  },
   test: {
     globals: true,
     environment: 'jsdom',
