@@ -2,7 +2,7 @@
  * Event service for ZoneMinder API
  */
 import api from './api';
-import { Event, EventsResponse, EventItem, EventsQueryParams } from '../types';
+import { Event, EventsResponse, EventItem, EventsQueryParams, EventFrame } from '../types';
 
 class EventService {
   /**
@@ -19,6 +19,8 @@ class EventService {
       }
       queryParams.append('limit', limit.toString());
       queryParams.append('page', page.toString());
+      queryParams.append('sort', 'StartTime');
+      queryParams.append('direction', 'desc');
       
       const response = await api.get<EventsResponse>(`/zm/api/events.json?${queryParams.toString()}`);
       
@@ -64,12 +66,17 @@ class EventService {
   async getEvent(id: number): Promise<Event> {
     const response = await api.get(`/zm/api/events/${id}.json`);
     
-    // ZoneMinder API returns { event: { Event: { ... }, Monitor: { ... }, ... } }
-    // We need to extract the actual Event object from response.data.event.Event
+    // ZoneMinder API returns { event: { Event: { ... }, Frame: [...], Monitor: { ... } } }
+    // We need to extract the Event object and attach the Frame array
     const eventData = response.data.event?.Event || response.data.Event;
     
     if (!eventData) {
       throw new Error('Event data not found in response');
+    }
+    
+    // Attach Frame array if present (it's a sibling of Event in the response)
+    if (response.data.event?.Frame) {
+      eventData.Frame = response.data.event.Frame;
     }
     
     return eventData;
@@ -296,6 +303,52 @@ class EventService {
    */
   getEventVideoUrl(eventId: number, token: string): string {
     return `http://192.168.1.60/zm/index.php?view=video&eid=${eventId}&token=${token}`;
+  }
+
+  /**
+   * Get frames for an event (includes alarm frame info)
+   * @param eventId - The event ID
+   * @returns Array of frame data with Type (Alarm/Normal), Score, etc.
+   */
+  async getEventFrames(eventId: number): Promise<EventFrame[]> {
+    try {
+      const response = await api.get(`/zm/api/events/${eventId}/frames.json`);
+      // ZoneMinder returns { frames: { Frame: [...] } } or { frames: [...] }
+      const framesData = response.data.frames;
+      
+      if (Array.isArray(framesData)) {
+        return framesData.map((f: { Frame?: EventFrame } | EventFrame) => {
+          // Handle both { Frame: {...} } and direct frame object formats
+          const frame = 'Frame' in f ? f.Frame : f;
+          return {
+            FrameId: frame.FrameId,
+            Type: frame.Type,
+            Timestamp: frame.Timestamp,
+            Delta: frame.Delta,
+            Score: frame.Score || 0
+          };
+        });
+      }
+      
+      // Handle case where frames is an object with numeric keys
+      if (typeof framesData === 'object' && framesData !== null) {
+        return Object.values(framesData).map((f: { Frame?: EventFrame } | EventFrame) => {
+          const frame = 'Frame' in f ? f.Frame : f;
+          return {
+            FrameId: frame.FrameId,
+            Type: frame.Type,
+            Timestamp: frame.Timestamp,
+            Delta: frame.Delta,
+            Score: frame.Score || 0
+          };
+        });
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch event frames:', error);
+      return [];
+    }
   }
 }
 

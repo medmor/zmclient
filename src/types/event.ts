@@ -36,6 +36,7 @@ export interface EventData {
   Executed: number;
   DefaultVideo: string;
   DefaultImage: string;
+  Frame?: EventFrame[]; // Frame data included in event response
 }
 
 // API response structure from ZoneMinder
@@ -74,6 +75,7 @@ export interface Event {
   Videoed: boolean;
   DefaultVideo: string;
   DefaultImage: string;
+  Frame?: EventFrame[]; // Frame data included in event response
 }
 
 // Query parameters for fetching events

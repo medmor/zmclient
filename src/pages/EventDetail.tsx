@@ -47,6 +47,7 @@ const EventDetail: React.FC = () => {
   const [currentFrame, setCurrentFrame] = useState(1);
   const [streamKey, setStreamKey] = useState(0); // Used to force img reload
   const [connkey, setConnkey] = useState<number>(() => Math.floor(Math.random() * 1000000) + 100000); // Generate connkey on mount
+  const [alarmFrames, setAlarmFrames] = useState<number[]>([]); // Frame IDs that are alarms
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -63,6 +64,14 @@ const EventDetail: React.FC = () => {
         
         const eventData = await eventService.getEvent(parseInt(id));
         setEvent(eventData);
+        
+        // Extract alarm frame IDs from embedded Frame array
+        if (eventData.Frame && Array.isArray(eventData.Frame)) {
+          const alarmFrameIds = eventData.Frame
+            .filter((f: { Type: string; FrameId: number }) => f.Type === 'Alarm')
+            .map((f: { Type: string; FrameId: number }) => f.FrameId);
+          setAlarmFrames(alarmFrameIds);
+        }
         
         // Fetch monitor info
         const monitors = await monitorService.getMonitors();
@@ -348,17 +357,30 @@ const EventDetail: React.FC = () => {
               </IonButton>
             </div>
 
-            {/* Frame Progress Bar */}
+            {/* Frame Progress Bar with Alarm Indicators */}
             {event && (
               <div className="frame-progress">
                 <IonLabel>Frame: {currentFrame} / {event.Frames}</IonLabel>
-                <IonRange
-                  min={1}
-                  max={event.Frames}
-                  value={currentFrame}
-                  onIonChange={(e) => handleFrameChange(e.detail.value as number)}
-                  color="primary"
-                />
+                <div className="slider-container">
+                  {/* Alarm frame indicators */}
+                  <div className="alarm-markers">
+                    {alarmFrames.map((frameId) => (
+                      <div
+                        key={frameId}
+                        className="alarm-marker"
+                        style={{ left: `${((frameId - 1) / (event.Frames - 1)) * 100}%` }}
+                        title={`Alarm frame ${frameId}`}
+                      />
+                    ))}
+                  </div>
+                  <IonRange
+                    min={1}
+                    max={event.Frames}
+                    value={currentFrame}
+                    onIonChange={(e) => handleFrameChange(e.detail.value as number)}
+                    color="primary"
+                  />
+                </div>
               </div>
             )}
 
