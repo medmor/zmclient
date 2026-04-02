@@ -72,8 +72,6 @@ const Events: React.FC = () => {
         page: pageNum,
       });
       
-      console.log('Events loaded:', newEvents);
-      
       if (append) {
         setEvents(prev => [...prev, ...newEvents]);
       } else {
@@ -157,6 +155,8 @@ const Events: React.FC = () => {
   };
 
   const goToEventDetail = (eventId: number) => {
+    // Blur active element to prevent focus on aria-hidden elements
+    (document.activeElement as HTMLElement)?.blur();
     history.push(`/events/${eventId}`);
   };
 

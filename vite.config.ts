@@ -28,6 +28,11 @@ export default defineConfig({
         headers: {
           'X-Forwarded-Host': 'localhost'
         }
+      },
+      '/zm/index.php': {
+        target: process.env.VITE_ZM_SERVER_URL || 'http://192.168.1.60',
+        changeOrigin: true,
+        secure: false,
       }
     }
   },

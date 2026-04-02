@@ -68,3 +68,57 @@
   --padding-top: 4px;
   --padding-bottom: 4px;
 }
+
+/* Playback Controls */
+.playback-controls {
+  width: 100%;
+  max-width: 800px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+}
+
+.control-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.frame-progress {
+  margin-bottom: 12px;
+}
+
+.frame-progress ion-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+}
+
+.speed-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.speed-selector ion-label {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+}
+
+.speed-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.speed-buttons ion-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  font-size: 0.8rem;
+}
