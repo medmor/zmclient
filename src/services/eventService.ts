@@ -317,31 +317,38 @@ class EventService {
       const framesData = response.data.frames;
       
       if (Array.isArray(framesData)) {
-        return framesData.map((f: { Frame?: EventFrame } | EventFrame) => {
-          // Handle both { Frame: {...} } and direct frame object formats
-          const frame = 'Frame' in f ? f.Frame : f;
-          return {
-            FrameId: frame.FrameId,
-            Type: frame.Type,
-            Timestamp: frame.Timestamp,
-            Delta: frame.Delta,
-            Score: frame.Score || 0
-          };
-        });
+        return framesData
+          .map((f: unknown) => {
+            // Handle both { Frame: {...} } and direct frame object formats
+            const frame = (typeof f === 'object' && f !== null && 'Frame' in f) ? (f as { Frame?: EventFrame }).Frame : f as EventFrame;
+            if (!frame) return null;
+            return {
+              FrameId: frame.FrameId,
+              Type: frame.Type,
+              Timestamp: frame.Timestamp,
+              Delta: frame.Delta,
+              Score: frame.Score || 0
+            };
+          })
+          .filter((f): f is { FrameId: number; Type: string; Timestamp: string; Delta: number; Score: number } => f !== null);
       }
       
       // Handle case where frames is an object with numeric keys
       if (typeof framesData === 'object' && framesData !== null) {
-        return Object.values(framesData).map((f: { Frame?: EventFrame } | EventFrame) => {
-          const frame = 'Frame' in f ? f.Frame : f;
-          return {
-            FrameId: frame.FrameId,
-            Type: frame.Type,
-            Timestamp: frame.Timestamp,
-            Delta: frame.Delta,
-            Score: frame.Score || 0
-          };
-        });
+        return Object.values(framesData)
+          .map((f: unknown) => {
+            // Handle both { Frame: {...} } and direct frame object formats
+            const frame = (typeof f === 'object' && f !== null && 'Frame' in f) ? (f as { Frame?: EventFrame }).Frame : f as EventFrame;
+            if (!frame) return null;
+            return {
+              FrameId: frame.FrameId,
+              Type: frame.Type,
+              Timestamp: frame.Timestamp,
+              Delta: frame.Delta,
+              Score: frame.Score || 0
+            };
+          })
+          .filter((f): f is { FrameId: number; Type: string; Timestamp: string; Delta: number; Score: number } => f !== null);
       }
       
       return [];
