@@ -8,6 +8,8 @@ import Login from './pages/Login';
 import Home from './pages/Home';
 import Monitors from './pages/Monitors';
 import MonitorDetail from './pages/MonitorDetail';
+import Events from './pages/Events';
+import EventDetail from './pages/EventDetail';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -88,6 +90,16 @@ const App: React.FC = () => (
             <Route exact path="/monitors/:id">
               <ProtectedRoute>
                 <MonitorDetail />
+              </ProtectedRoute>
+            </Route>
+            <Route exact path="/events">
+              <ProtectedRoute>
+                <Events />
+              </ProtectedRoute>
+            </Route>
+            <Route exact path="/events/:id">
+              <ProtectedRoute>
+                <EventDetail />
               </ProtectedRoute>
             </Route>
             <Route exact path="/">
