@@ -92,6 +92,48 @@ const EventDetail: React.FC = () => {
     };
   }, [connkey, token]);
 
+  // Poll stream status to sync playback position (recursive pattern like ZoneMinder)
+  useEffect(() => {
+    if (!token || connkey === 0 || !isStreaming || !event) return;
+    
+    let pollErrors = 0;
+    const MAX_POLL_ERRORS = 3;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
+    const pollStatus = async () => {
+      try {
+        const status = await eventService.queryStreamStatus(connkey, token);
+        if (status) {
+          pollErrors = 0; // Reset error count on success
+          // Convert progress (seconds) to frame number using event's FPS
+          if (event.Frames && event.Length) {
+            const frameFromProgress = Math.round((status.progress / event.Length) * event.Frames);
+            setCurrentFrame(Math.max(1, Math.min(frameFromProgress, event.Frames)));
+          }
+          // Sync playing state
+          if (status.paused === isStreaming) {
+            setIsStreaming(!status.paused);
+          }
+        }
+      } catch (err) {
+        pollErrors++;
+        // Stop polling if too many errors
+        if (pollErrors >= MAX_POLL_ERRORS) {
+          return;
+        }
+      }
+      // Schedule next poll (recursive pattern)
+      if (pollErrors < MAX_POLL_ERRORS) {
+        timeoutId = setTimeout(pollStatus, 2000);
+      }
+    };
+    
+    // Start polling after initial delay
+    timeoutId = setTimeout(pollStatus, 1000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [token, connkey, isStreaming, event]);
+
   const formatDuration = (length: number): string => {
     const minutes = Math.floor(length / 60);
     const seconds = Math.floor(length % 60);
@@ -159,9 +201,18 @@ const EventDetail: React.FC = () => {
     }
   };
 
-  const handleFrameChange = (frame: number) => {
+  const handleFrameChange = async (frame: number) => {
     setCurrentFrame(frame);
-    setStreamKey(prev => prev + 1); // Force reload
+    // Use CMD_SEEK with offset (time in seconds) instead of frame number
+    if (token && connkey > 0 && event && event.Frames && event.Length) {
+      try {
+        // Convert frame number to time offset
+        const offset = (frame / event.Frames) * event.Length;
+        await eventService.seekToOffset(connkey, offset, token);
+      } catch (err) {
+        console.error('Failed to seek to offset:', err);
+      }
+    }
   };
 
   const stepForward = async () => {

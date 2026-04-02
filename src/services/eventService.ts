@@ -206,6 +206,92 @@ class EventService {
   }
 
   /**
+   * Seek to a specific time offset in the stream (uses CMD_SEEK = 14)
+   * @param connkey - The connection key of the stream
+   * @param offset - Time offset in seconds to seek to
+   * @param token - Authentication token
+   */
+  async seekToOffset(
+    connkey: number,
+    offset: number,
+    token: string
+  ): Promise<void> {
+    // CMD_SEEK = 14 (from zm_stream.h enum: CMD_NONE=0...CMD_SEEK=14)
+    // Note: CMD_SEEK uses 'offset' parameter (time in seconds), not 'frame'
+    const params = new URLSearchParams({
+      view: 'request',
+      request: 'stream',
+      connkey: connkey.toString(),
+      command: '14', // CMD_SEEK
+      offset: offset.toString(),
+      token: token
+    });
+    
+    const url = `/zm/index.php?${params.toString()}`;
+    
+    try {
+      await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+    } catch {
+      // Stream control is best-effort, ignore errors
+    }
+  }
+
+  /**
+   * Query stream status (uses CMD_QUERY = 99)
+   * Returns current progress (seconds), rate, and other stream info
+   * @param connkey - The connection key of the stream
+   * @param token - Authentication token
+   */
+  async queryStreamStatus(
+    connkey: number,
+    token: string
+  ): Promise<{ progress: number; rate: number; paused: boolean } | null> {
+    // CMD_QUERY = 99 (from zm_stream.h enum)
+    const params = new URLSearchParams({
+      view: 'request',
+      request: 'stream',
+      connkey: connkey.toString(),
+      command: '99', // CMD_QUERY
+      token: token
+    });
+    
+    const url = `/zm/index.php?${params.toString()}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      // ZoneMinder returns status in format: { status: { progress: number (seconds), rate: number, paused: boolean } }
+      if (data && data.status) {
+        return {
+          progress: data.status.progress || 0,
+          rate: data.status.rate || 100,
+          paused: data.status.paused === true
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get event video URL
    */
   getEventVideoUrl(eventId: number, token: string): string {
