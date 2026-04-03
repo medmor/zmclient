@@ -19,7 +19,6 @@ import {
 } from '@ionic/react';
 import { arrowBackOutline } from 'ionicons/icons';
 import { playOutline, pauseOutline, playForwardOutline, playBackOutline, videocamOutline, timeOutline, refreshOutline } from 'ionicons/icons';
-import { Capacitor } from '@capacitor/core';
 import { eventService, monitorService } from '../services';
 import { tokenStorage } from '../services/api';
 import { Event, Monitor } from '../types';
@@ -103,17 +102,13 @@ const EventDetail: React.FC = () => {
     };
   }, [connkey, token]);
 
-  // Web platform: Set stream URL directly
+  // Set stream URL for both web and native platforms
+  // MJPEG streams work directly in <img> tags - no need to fetch as blob
+  // The capacitor.config.ts has allowMixedContent: true for HTTP streams
   useEffect(() => {
-    console.log('[EventDetail Web] useEffect triggered', { 
-      isNative: Capacitor.isNativePlatform(), 
-      hasToken: !!token, 
-      hasEvent: !!event 
-    });
+    if (!token || !event) return;
     
-    if (Capacitor.isNativePlatform() || !token || !event) return;
-    
-    const setWebStreamUrl = async () => {
+    const setStreamUrlAsync = async () => {
       const url = await eventService.getEventStreamUrl(event.Id, token, {
         rate: playbackSpeed,
         frame: currentFrame,
@@ -122,69 +117,12 @@ const EventDetail: React.FC = () => {
         replay: 'none',
         connkey: connkey || undefined,
       });
-      console.log('[EventDetail Web] Stream URL:', url);
       if (url) {
         setStreamUrl(url);
       }
     };
     
-    setWebStreamUrl();
-  }, [token, event, streamKey, playbackSpeed, currentFrame, connkey]);
-
-  // Native platform: Fetch stream as blob to avoid Mixed Content issues
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !token || !event) return;
-    
-    let timeoutId: ReturnType<typeof setTimeout>;
-    let objectUrl: string | null = null;
-    
-    const fetchStream = async (logDetails: boolean = false) => {
-      try {
-        const url = await getStreamUrl();
-        if (logDetails) {
-          console.log('[EventDetail] Stream URL:', url);
-        }
-        if (!url) {
-          if (logDetails) {
-            console.log('[EventDetail] No URL returned from getStreamUrl()');
-          }
-          return;
-        }
-        if (logDetails) {
-          console.log('[EventDetail] Fetching stream from:', url);
-        }
-        const response = await fetch(url);
-        if (logDetails) {
-          console.log('[EventDetail] Response status:', response.status);
-        }
-        const blob = await response.blob();
-        if (logDetails) {
-          console.log('[EventDetail] Blob size:', blob.size, 'type:', blob.type);
-        }
-        objectUrl = URL.createObjectURL(blob);
-        if (logDetails) {
-          console.log('[EventDetail] Object URL:', objectUrl);
-        }
-        setStreamUrl(objectUrl);
-      } catch (err) {
-        console.error('[EventDetail] Failed to fetch stream:', err);
-      }
-    };
-    
-    // Initial fetch with logging
-    fetchStream(true);
-    
-    // Poll for updates (stream is MJPEG, so we need to refresh)
-    const pollInterval = setInterval(() => {
-      fetchStream(false); // No logging for poll updates
-    }, 100); // Fast polling for smooth stream
-    
-    return () => {
-      clearInterval(pollInterval);
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
+    setStreamUrlAsync();
   }, [token, event, streamKey, playbackSpeed, currentFrame, connkey]);
 
   // Poll stream status to sync playback position (recursive pattern like ZoneMinder)
