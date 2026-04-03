@@ -15,6 +15,7 @@ import {
 } from '@ionic/react';
 import { logOutOutline, cameraOutline, videocamOutline, settingsOutline } from 'ionicons/icons';
 import { useAuth } from '../contexts';
+import ThemeToggle from '../components/ThemeToggle';
 import './Home.css';
 
 const Home: React.FC = () => {
@@ -57,6 +58,7 @@ const Home: React.FC = () => {
           </IonButtons>
           <IonTitle>ZoneMinder</IonTitle>
           <IonButtons slot="end">
+            <ThemeToggle />
             <IonButton onClick={handleLogout} disabled={isLoading}>
               <IonIcon icon={logOutOutline} slot="icon-only" />
             </IonButton>

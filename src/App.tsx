@@ -3,7 +3,7 @@ import { IonApp, IonRouterOutlet, setupIonicReact, IonSpinner, IonContent } from
 import { IonReactRouter } from '@ionic/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { AuthProvider, useAuth } from './contexts';
+import { AuthProvider, useAuth, ThemeProvider } from './contexts';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import Monitors from './pages/Monitors';
@@ -70,8 +70,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const App: React.FC = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <IonApp>
+    <ThemeProvider>
+      <AuthProvider>
+        <IonApp>
         <IonReactRouter>
           <IonRouterOutlet>
             <Route exact path="/login">
@@ -109,6 +110,7 @@ const App: React.FC = () => (
         </IonReactRouter>
       </IonApp>
     </AuthProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
