@@ -19,7 +19,9 @@ import {
 } from '@ionic/react';
 import { arrowBackOutline } from 'ionicons/icons';
 import { playOutline, pauseOutline, playForwardOutline, playBackOutline, videocamOutline, timeOutline, refreshOutline } from 'ionicons/icons';
+import { Capacitor } from '@capacitor/core';
 import { eventService, monitorService } from '../services';
+import { tokenStorage } from '../services/api';
 import { Event, Monitor } from '../types';
 import './EventDetail.css';
 
@@ -48,6 +50,7 @@ const EventDetail: React.FC = () => {
   const [streamKey, setStreamKey] = useState(0); // Used to force img reload
   const [connkey, setConnkey] = useState<number>(() => Math.floor(Math.random() * 1000000) + 100000); // Generate connkey on mount
   const [alarmFrames, setAlarmFrames] = useState<number[]>([]); // Frame IDs that are alarms
+  const [streamUrl, setStreamUrl] = useState<string>(''); // For native platform blob URL
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -55,10 +58,9 @@ const EventDetail: React.FC = () => {
       setError(null);
       
       try {
-        // Get the token from localStorage
-        const storedValue = localStorage.getItem('zm_auth_tokens');
-        if (storedValue) {
-          const tokens = JSON.parse(storedValue);
+        // Get the token from tokenStorage (works on both web and native platforms)
+        const tokens = await tokenStorage.getTokens();
+        if (tokens) {
           setToken(tokens.access_token);
         }
         
@@ -100,6 +102,90 @@ const EventDetail: React.FC = () => {
       }
     };
   }, [connkey, token]);
+
+  // Web platform: Set stream URL directly
+  useEffect(() => {
+    console.log('[EventDetail Web] useEffect triggered', { 
+      isNative: Capacitor.isNativePlatform(), 
+      hasToken: !!token, 
+      hasEvent: !!event 
+    });
+    
+    if (Capacitor.isNativePlatform() || !token || !event) return;
+    
+    const setWebStreamUrl = async () => {
+      const url = await eventService.getEventStreamUrl(event.Id, token, {
+        rate: playbackSpeed,
+        frame: currentFrame,
+        scale: 100,
+        maxfps: 30,
+        replay: 'none',
+        connkey: connkey || undefined,
+      });
+      console.log('[EventDetail Web] Stream URL:', url);
+      if (url) {
+        setStreamUrl(url);
+      }
+    };
+    
+    setWebStreamUrl();
+  }, [token, event, streamKey, playbackSpeed, currentFrame, connkey]);
+
+  // Native platform: Fetch stream as blob to avoid Mixed Content issues
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !token || !event) return;
+    
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let objectUrl: string | null = null;
+    
+    const fetchStream = async (logDetails: boolean = false) => {
+      try {
+        const url = await getStreamUrl();
+        if (logDetails) {
+          console.log('[EventDetail] Stream URL:', url);
+        }
+        if (!url) {
+          if (logDetails) {
+            console.log('[EventDetail] No URL returned from getStreamUrl()');
+          }
+          return;
+        }
+        if (logDetails) {
+          console.log('[EventDetail] Fetching stream from:', url);
+        }
+        const response = await fetch(url);
+        if (logDetails) {
+          console.log('[EventDetail] Response status:', response.status);
+        }
+        const blob = await response.blob();
+        if (logDetails) {
+          console.log('[EventDetail] Blob size:', blob.size, 'type:', blob.type);
+        }
+        objectUrl = URL.createObjectURL(blob);
+        if (logDetails) {
+          console.log('[EventDetail] Object URL:', objectUrl);
+        }
+        setStreamUrl(objectUrl);
+      } catch (err) {
+        console.error('[EventDetail] Failed to fetch stream:', err);
+      }
+    };
+    
+    // Initial fetch with logging
+    fetchStream(true);
+    
+    // Poll for updates (stream is MJPEG, so we need to refresh)
+    const pollInterval = setInterval(() => {
+      fetchStream(false); // No logging for poll updates
+    }, 100); // Fast polling for smooth stream
+    
+    return () => {
+      clearInterval(pollInterval);
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [token, event, streamKey, playbackSpeed, currentFrame, connkey]);
 
   // Poll stream status to sync playback position (recursive pattern like ZoneMinder)
   useEffect(() => {
@@ -185,9 +271,9 @@ const EventDetail: React.FC = () => {
   };
 
   // Get the stream URL with current playback settings
-  const getStreamUrl = useCallback(() => {
+  const getStreamUrl = useCallback(async () => {
     if (!event || !token) return '';
-    return eventService.getEventStreamUrl(event.Id, token, {
+    return await eventService.getEventStreamUrl(event.Id, token, {
       rate: playbackSpeed,
       frame: currentFrame,
       scale: 100,
@@ -322,7 +408,7 @@ const EventDetail: React.FC = () => {
           {token && (
             <img
               key={streamKey}
-              src={getStreamUrl()}
+              src={streamUrl || ''}
               alt={`Event ${event.Id}`}
               className="event-image"
             />

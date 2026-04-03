@@ -1,8 +1,9 @@
 /**
  * Event service for ZoneMinder API
  */
-import api from './api';
+import api, { tokenStorage } from './api';
 import { Event, EventsResponse, EventItem, EventsQueryParams, EventFrame } from '../types';
+import { Capacitor } from '@capacitor/core';
 
 class EventService {
   /**
@@ -102,7 +103,7 @@ class EventService {
    *   - replay: Replay mode ('none', 'single', 'all')
    *   - connkey: Connection key for stream control (required for pause/play)
    */
-  getEventStreamUrl(
+  async getEventStreamUrl(
     eventId: number,
     token: string,
     options: {
@@ -113,9 +114,16 @@ class EventService {
       replay?: 'none' | 'single' | 'all';
       connkey?: number;
     } = {}
-  ): string {
+  ): Promise<string> {
     const { rate = 100, frame = 1, scale = 100, maxfps = 30, replay = 'none', connkey } = options;
-    let url = `http://192.168.1.60/zm/cgi-bin/nph-zms?mode=jpeg&frame=${frame}&scale=${scale}&rate=${rate}&maxfps=${maxfps}&replay=${replay}&source=event&event=${eventId}&token=${token}`;
+    
+    const baseUrl = await tokenStorage.getBaseUrl();
+    if (!baseUrl) {
+      console.error('No base URL configured for event stream');
+      return '';
+    }
+    
+    let url = `${baseUrl}/zm/cgi-bin/nph-zms?mode=jpeg&frame=${frame}&scale=${scale}&rate=${rate}&maxfps=${maxfps}&replay=${replay}&source=event&event=${eventId}&token=${token}`;
     if (connkey) {
       url += `&connkey=${connkey}`;
     }
@@ -160,16 +168,34 @@ class EventService {
       token: token
     });
     
-    const url = `/zm/index.php?${params.toString()}`;
-    
     try {
-      await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json'
+      if (Capacitor.isNativePlatform()) {
+        // On native platforms, use absolute URL with native fetch
+        const baseUrl = await tokenStorage.getBaseUrl();
+        if (!baseUrl) {
+          console.error('No base URL configured for stream control');
+          return;
         }
-      });
+        
+        const url = `${baseUrl}/zm/index.php?${params.toString()}`;
+        await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+      } else {
+        // On web, use relative URL with native fetch
+        const url = `/zm/index.php?${params.toString()}`;
+        await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+      }
     } catch {
       // Stream control is best-effort, ignore errors
     }
@@ -197,16 +223,34 @@ class EventService {
       token: token
     });
     
-    const url = `/zm/index.php?${params.toString()}`;
-    
     try {
-      await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json'
+      if (Capacitor.isNativePlatform()) {
+        // On native platforms, use absolute URL with native fetch
+        const baseUrl = await tokenStorage.getBaseUrl();
+        if (!baseUrl) {
+          console.error('No base URL configured for stream control');
+          return;
         }
-      });
+        
+        const url = `${baseUrl}/zm/index.php?${params.toString()}`;
+        await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+      } else {
+        // On web, use relative URL with native fetch
+        const url = `/zm/index.php?${params.toString()}`;
+        await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+      }
     } catch {
       // Stream control is best-effort, ignore errors
     }
@@ -234,16 +278,34 @@ class EventService {
       token: token
     });
     
-    const url = `/zm/index.php?${params.toString()}`;
-    
     try {
-      await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json'
+      if (Capacitor.isNativePlatform()) {
+        // On native platforms, use absolute URL with native fetch
+        const baseUrl = await tokenStorage.getBaseUrl();
+        if (!baseUrl) {
+          console.error('No base URL configured for stream control');
+          return;
         }
-      });
+        
+        const url = `${baseUrl}/zm/index.php?${params.toString()}`;
+        await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+      } else {
+        // On web, use relative URL with native fetch
+        const url = `/zm/index.php?${params.toString()}`;
+        await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+      }
     } catch {
       // Stream control is best-effort, ignore errors
     }

@@ -12,11 +12,14 @@ class AuthService {
    * ZoneMinder uses cookie-based session authentication
    */
   async login(credentials: LoginCredentials, baseUrl: string): Promise<AuthTokens> {
-    // In development, the Vite proxy handles CORS - don't set base URL
+    // Always store the base URL - it's needed for stream URLs (img src, blob fetches)
+    // even in development mode where the Vite proxy handles API requests
+    await tokenStorage.setBaseUrl(baseUrl);
+    
+    // In development, the Vite proxy handles CORS - don't set axios base URL
     // In production, set the base URL for API requests
     if (!import.meta.env.DEV) {
       setApiBaseUrl(baseUrl);
-      await tokenStorage.setBaseUrl(baseUrl);
     }
 
     try {

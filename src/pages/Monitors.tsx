@@ -16,7 +16,8 @@ import {
   IonCol,
 } from '@ionic/react';
 import { refreshOutline, videocamOutline } from 'ionicons/icons';
-import { monitorService } from '../services';
+import { Capacitor } from '@capacitor/core';
+import { monitorService, tokenStorage } from '../services';
 import { Monitor } from '../types';
 import './Monitors.css';
 
@@ -25,21 +26,17 @@ const Monitors: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string>('');
+  const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
   const history = useHistory();
 
   const fetchMonitors = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Get the token from localStorage (dev mode) or use the token from monitorService
-      // The token is already added as a query parameter by the API interceptor
-      // So we just need to fetch monitors - the token will be included automatically
+      // Get the token using tokenStorage (handles both native and web platforms)
+      const tokens = await tokenStorage.getTokens();
       
-      // For the thumbnail URLs, we need the token
-      // Use localStorage directly in development mode
-      const storedValue = localStorage.getItem('zm_auth_tokens');
-      if (storedValue) {
-        const tokens = JSON.parse(storedValue);
+      if (tokens?.access_token) {
         setToken(tokens.access_token);
       }
       
@@ -58,6 +55,47 @@ const Monitors: React.FC = () => {
     fetchMonitors();
   }, []);
 
+  // Fetch thumbnail image as blob using CapacitorHttp-patched fetch
+  // This bypasses Mixed Content restrictions for HTTP images on native
+  // On web, uses Vite proxy to avoid CORS
+  const fetchThumbnail = async (monitorId: number, authToken: string) => {
+    try {
+      // Use platform-aware URL:
+      // - Native: absolute URL (CapacitorHttp patches fetch to bypass Mixed Content)
+      // - Web: relative URL (Vite proxy handles CORS)
+      const baseUrl = Capacitor.isNativePlatform()
+        ? 'http://192.168.1.60'
+        : '';
+      
+      // mode=single returns a single JPEG frame instead of MJPEG stream
+      const url = `${baseUrl}/zm/cgi-bin/nph-zms?mode=single&monitor=${monitorId}&scale=50&token=${authToken}`;
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setImageUrls(prev => ({ ...prev, [monitorId]: objectUrl }));
+    } catch (err) {
+      console.error(`Failed to load thumbnail for monitor ${monitorId}:`, err);
+    }
+  };
+
+  // Fetch thumbnails when monitors and token are available
+  useEffect(() => {
+    if (token && monitors.length > 0) {
+      monitors.forEach(m => fetchThumbnail(m.Id, token));
+    }
+    
+    // Cleanup: revoke object URLs when component unmounts
+    return () => {
+      Object.values(imageUrls).forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [token, monitors]);
+
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'running':
@@ -75,13 +113,6 @@ const Monitors: React.FC = () => {
 
   const handleMonitorClick = (monitorId: number) => {
     history.push(`/monitors/${monitorId}`);
-  };
-
-  // Generate thumbnail URL with low FPS (1 frame per second)
-  const getThumbnailUrl = (monitorId: number) => {
-    // ZoneMinder image path: /zm/cgi-bin/zms?mode=jpeg&monitor=<id>&token=<token>
-    // For low FPS, we can use the nph-zms endpoint with scale parameter
-    return `http://192.168.1.60/zm/cgi-bin/zms?mode=jpeg&monitor=${monitorId}&scale=50&token=${token}`;
   };
 
   return (
@@ -126,9 +157,9 @@ const Monitors: React.FC = () => {
                     onClick={() => handleMonitorClick(monitor.Id)}
                   >
                     <div className="thumbnail-image-container">
-                      {token ? (
+                      {imageUrls[monitor.Id] ? (
                         <img 
-                          src={getThumbnailUrl(monitor.Id)} 
+                          src={imageUrls[monitor.Id]} 
                           alt={monitor.Name}
                           className="thumbnail-image"
                         />

@@ -33,6 +33,11 @@ export default defineConfig({
         target: process.env.VITE_ZM_SERVER_URL || 'http://192.168.1.60',
         changeOrigin: true,
         secure: false,
+      },
+      '/zm/cgi-bin': {
+        target: process.env.VITE_ZM_SERVER_URL || 'http://192.168.1.60',
+        changeOrigin: true,
+        secure: false,
       }
     }
   },

@@ -12,7 +12,9 @@ import {
   IonText,
   IonBadge,
 } from '@ionic/react';
+import { Capacitor } from '@capacitor/core';
 import { monitorService } from '../services';
+import { tokenStorage } from '../services/api';
 import { Monitor } from '../types';
 import './MonitorDetail.css';
 
@@ -26,6 +28,9 @@ const MonitorDetail: React.FC = () => {
   const [token, setToken] = useState<string>('');
 
   useEffect(() => {
+    let streamInterval: NodeJS.Timeout | null = null;
+    let objectUrlToRevoke: string | null = null;
+
     const fetchMonitor = async () => {
       try {
         setIsLoading(true);
@@ -39,18 +44,57 @@ const MonitorDetail: React.FC = () => {
         
         setMonitor(foundMonitor);
         
-        // Get the token from localStorage (dev mode)
-        // Use the correct storage key 'zm_auth_tokens'
-        const storedValue = localStorage.getItem('zm_auth_tokens');
+        // Get the token using tokenStorage (works on both web and native platforms)
+        const tokens = await tokenStorage.getTokens();
         
-        if (storedValue) {
-          const tokens = JSON.parse(storedValue);
+        if (tokens && tokens.access_token) {
           setToken(tokens.access_token);
           
-          // Create the live stream URL with token
-          // ZoneMinder live stream: /zm/cgi-bin/zms?mode=jpeg&monitor=<id>&token=<token>
-          const streamUrl = `http://192.168.1.60/zm/cgi-bin/zms?mode=jpeg&monitor=${id}&token=${tokens.access_token}`;
-          setImageUrl(streamUrl);
+          // Get baseUrl from tokenStorage instead of hardcoding
+          const baseUrl = await tokenStorage.getBaseUrl();
+          
+          if (Capacitor.isNativePlatform()) {
+            if (!baseUrl) {
+              console.error('No base URL configured for monitor stream');
+              setError('Server URL not configured');
+              return;
+            }
+            
+            // On native platforms, fetch frames periodically using fetch()
+            const fetchFrame = async () => {
+              try {
+                // Use mode=single to get a single JPEG frame
+                const url = `${baseUrl}/zm/cgi-bin/nph-zms?mode=single&monitor=${id}&token=${tokens.access_token}`;
+                const response = await fetch(url);
+                if (response.ok) {
+                  const blob = await response.blob();
+                  const objectUrl = URL.createObjectURL(blob);
+                  
+                  // Revoke previous URL to avoid memory leaks
+                  if (objectUrlToRevoke) {
+                    URL.revokeObjectURL(objectUrlToRevoke);
+                  }
+                  objectUrlToRevoke = objectUrl;
+                  setImageUrl(objectUrl);
+                }
+              } catch (err) {
+                console.error('Failed to fetch stream frame:', err);
+              }
+            };
+
+            // Fetch initial frame
+            await fetchFrame();
+            setIsLoading(false);
+            
+            // Poll for new frames every 1 second for live stream effect
+            streamInterval = setInterval(fetchFrame, 1000);
+          } else {
+            // On web, use direct MJPEG stream URL
+            const streamUrl = baseUrl 
+              ? `${baseUrl}/zm/cgi-bin/zms?mode=jpeg&monitor=${id}&token=${tokens.access_token}`
+              : `/zm/cgi-bin/zms?mode=jpeg&monitor=${id}&token=${tokens.access_token}`;
+            setImageUrl(streamUrl);
+          }
         } else {
           setError('Not authenticated');
           history.push('/login');
@@ -64,6 +108,16 @@ const MonitorDetail: React.FC = () => {
     };
 
     fetchMonitor();
+
+    // Cleanup: revoke object URL and clear interval
+    return () => {
+      if (streamInterval) {
+        clearInterval(streamInterval);
+      }
+      if (objectUrlToRevoke) {
+        URL.revokeObjectURL(objectUrlToRevoke);
+      }
+    };
   }, [id, history]);
 
   const getStatusColor = (status: string) => {

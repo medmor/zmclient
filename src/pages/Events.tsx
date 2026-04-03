@@ -21,7 +21,9 @@ import {
   IonBadge,
 } from '@ionic/react';
 import { refreshOutline, videocamOutline, timeOutline, playOutline, stopOutline, openOutline } from 'ionicons/icons';
+import { Capacitor } from '@capacitor/core';
 import { eventService, monitorService } from '../services';
+import { tokenStorage } from '../services/api';
 import { Event, Monitor } from '../types';
 import './Events.css';
 
@@ -36,6 +38,8 @@ const Events: React.FC = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [streamingEvents, setStreamingEvents] = useState<Set<number>>(new Set());
+  const [thumbnailUrls, setThumbnailUrls] = useState<Map<number, string>>(new Map());
+  const [streamUrls, setStreamUrls] = useState<Map<number, string>>(new Map());
   const PAGE_SIZE = 10;
   const history = useHistory();
 
@@ -57,12 +61,11 @@ const Events: React.FC = () => {
     setError(null);
     
     try {
-      // Get the token from localStorage
-      const storedValue = localStorage.getItem('zm_auth_tokens');
-      if (!storedValue) {
+      // Get the token from tokenStorage (works on both web and native)
+      const tokens = await tokenStorage.getTokens();
+      if (!tokens) {
         throw new Error('No authentication token found');
       }
-      const tokens = JSON.parse(storedValue);
       const authToken = tokens.access_token;
       setToken(authToken);
       
@@ -101,6 +104,87 @@ const Events: React.FC = () => {
     setHasMore(true);
     fetchEvents(1, false);
   }, [selectedMonitorId]);
+
+  // Fetch thumbnails as blobs on native platforms (to avoid Mixed Content issues)
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !token || events.length === 0) return;
+
+    const fetchThumbnails = async () => {
+      const newUrls = new Map<number, string>();
+      
+      for (const event of events) {
+        // Skip if already streaming or already have thumbnail
+        if (streamingEvents.has(event.Id) || thumbnailUrls.has(event.Id)) continue;
+        
+        try {
+          const url = eventService.getEventThumbnailUrl(event.Id, token);
+          const response = await fetch(url);
+          if (response.ok) {
+            const blob = await response.blob();
+            newUrls.set(event.Id, URL.createObjectURL(blob));
+          }
+        } catch (err) {
+          console.error(`Failed to fetch thumbnail for event ${event.Id}:`, err);
+        }
+      }
+      
+      if (newUrls.size > 0) {
+        setThumbnailUrls(prev => {
+          const newMap = new Map(prev);
+          newUrls.forEach((value, key) => newMap.set(key, value));
+          return newMap;
+        });
+      }
+    };
+
+    fetchThumbnails();
+  }, [events, token, streamingEvents]);
+
+  // Handle streaming on native platforms (poll for frames)
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !token) return;
+
+    const streamIntervals = new Map<number, NodeJS.Timeout>();
+
+    streamingEvents.forEach((eventId) => {
+      const fetchFrame = async () => {
+        try {
+          const url = await eventService.getEventStreamUrl(eventId, token);
+          if (!url) return;
+          const response = await fetch(url);
+          if (response.ok) {
+            const blob = await response.blob();
+            setStreamUrls(prev => {
+              const newMap = new Map(prev);
+              const oldUrl = newMap.get(eventId);
+              if (oldUrl) URL.revokeObjectURL(oldUrl);
+              newMap.set(eventId, URL.createObjectURL(blob));
+              return newMap;
+            });
+          }
+        } catch (err) {
+          console.error(`Failed to fetch stream frame for event ${eventId}:`, err);
+        }
+      };
+
+      // Initial fetch
+      fetchFrame();
+      // Poll every 1 second
+      streamIntervals.set(eventId, setInterval(fetchFrame, 1000));
+    });
+
+    return () => {
+      streamIntervals.forEach((interval) => clearInterval(interval));
+    };
+  }, [streamingEvents, token]);
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+      streamUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   const handleRefresh = () => {
     setPage(1);
@@ -223,8 +307,12 @@ const Events: React.FC = () => {
                       {token && (
                         <img
                           src={isStreaming(event.Id) 
-                            ? eventService.getEventStreamUrl(event.Id, token)
-                            : eventService.getEventThumbnailUrl(event.Id, token)
+                            ? (Capacitor.isNativePlatform() && streamUrls.get(event.Id) 
+                              ? streamUrls.get(event.Id)!
+                              : '')
+                            : (Capacitor.isNativePlatform() && thumbnailUrls.get(event.Id)
+                              ? thumbnailUrls.get(event.Id)!
+                              : eventService.getEventThumbnailUrl(event.Id, token))
                           }
                           alt={`Event ${event.Id}`}
                           loading="lazy"
